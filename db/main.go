@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"database/sql"
@@ -42,7 +42,7 @@ func Initialize(username, password, database string) (Database, error) {
 	return db, nil
 }
 
-// AddPassenger add a passenger who starts a trip into the database.
+// AddPassenger add a client who starts a trip into the database.
 func (db *Database) AddPassenger(passenger *models.Passenger) error {
 	var id int
 	var createdAt string
@@ -89,7 +89,7 @@ func (db *Database) GetAvailableDrivers() (models.DriverList, error) {
 	for rows.Next() {
 		var driver models.Driver
 		if err := rows.Scan(&driver.ID, &driver.Name, &driver.Loc,
-			&driver.Available, &driver.Rating, &driver.LastTripEndAt); err != nil {
+			&driver.Available, &driver.Rating, &driver.WithPassenger, &driver.LastTripEndAt); err != nil {
 			return list, err
 		}
 		list.Drivers = append(list.Drivers, driver)
@@ -110,7 +110,7 @@ func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
 	for rows.Next() {
 		var passenger models.Passenger
 		if err := rows.Scan(&passenger.ID, &passenger.Name, &passenger.PickupLoc,
-			&passenger.DropLoc, &passenger.Rating, &passenger.InRide, &passenger.CreatedAt); err != nil {
+			&passenger.DropLoc, &passenger.Rating, &passenger.InRide, &passenger.WithDriver, &passenger.CreatedAt); err != nil {
 			return list, err
 		}
 		list.Passengers = append(list.Passengers, passenger)
@@ -118,7 +118,7 @@ func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
 	return list, nil
 }
 
-// DeletePassenger delete the passenger after the trip is end.
+// DeletePassenger delete the client after the trip is end.
 func (db *Database) DeletePassenger(passengerID int) error {
 	query := `DELETE FROM passengers WHERE id = $1;`
 	_, err := db.Conn.Exec(query, passengerID)
@@ -143,9 +143,9 @@ func (db *Database) DeleteDriver(driverID int) error {
 }
 
 // UpdateDriverAvailability update driver available status.
-func (db *Database) UpdateDriverAvailability(driverId int) error {
-	query := `UPDATE drivers SET available=NOT available WHERE id=$1;`
-	_, err := db.Conn.Exec(query, driverId)
+func (db *Database) UpdateDriverAvailability(driverId int, withPassenger *models.Passenger) error {
+	query := `UPDATE drivers SET available=NOT available, with_passenger=$2 WHERE id=$1;`
+	_, err := db.Conn.Exec(query, driverId, (*withPassenger).ID)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -166,7 +166,7 @@ func (db *Database) UpdateDriverLoc(driverId int, newLoc int) error {
 	}
 }
 
-// UpdateLastTripEndTime updates the driver's location regularly.
+// UpdateLastTripEndTime updates the driver's last trip end time.
 func (db *Database) UpdateLastTripEndTime(driverId int) error {
 	query := `UPDATE drivers SET last_trip_end_at=$1 WHERE id=$2;`
 	_, err := db.Conn.Exec(query, time.Now(), driverId)
@@ -191,9 +191,9 @@ func (db *Database) UpdateDriverRating(driverId int, newRating float64) error {
 }
 
 // UpdatePassengerStatus update passengers' status.
-func (db *Database) UpdatePassengerStatus(passengerId int) error {
-	query := `UPDATE passengers SET in_ride=NOT in_ride WHERE id=$1;`
-	_, err := db.Conn.Exec(query, passengerId)
+func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Driver) error {
+	query := `UPDATE passengers SET in_ride=NOT in_ride, with_driver=$2 WHERE id=$1;`
+	_, err := db.Conn.Exec(query, passengerId, (*withDriver).ID)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -227,7 +227,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	log.Println("Adding passenger", passenger1)
+	log.Println("Adding client", passenger1)
 
 	passenger2 := &models.Passenger{}
 	passenger2.Init("passenger_2", 1, 9, 4.6, time.Now().String())
@@ -235,7 +235,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	log.Println("Adding passenger", passenger2)
+	log.Println("Adding client", passenger2)
 
 	driver1 := &models.Driver{}
 	driver1.Init("driver_1", 4, 4.9, time.Now().String())
@@ -255,13 +255,13 @@ func main() {
 
 	// driver1 match with passenger1
 	log.Println("start trip.....")
-	err = db.UpdatePassengerStatus(passenger1.ID)
+	err = db.UpdatePassengerStatus(passenger1.ID, driver1)
 	if err != nil {
 		return
 	}
-	log.Println("Changed passenger state", passenger1)
+	log.Println("Changed client state", passenger1)
 
-	err = db.UpdateDriverAvailability(driver1.ID)
+	err = db.UpdateDriverAvailability(driver1.ID, passenger1)
 	if err != nil {
 		return
 	}
@@ -276,7 +276,7 @@ func main() {
 
 	//// trip end
 	log.Println("end trip.....")
-	err = db.UpdateDriverAvailability(driver1.ID)
+	err = db.UpdateDriverAvailability(driver1.ID, passenger1)
 	if err != nil {
 		return
 	}
@@ -290,6 +290,6 @@ func main() {
 	if err != nil {
 		return
 	}
-	log.Println("delete passenger", passenger1)
+	log.Println("delete client", passenger1)
 
 }

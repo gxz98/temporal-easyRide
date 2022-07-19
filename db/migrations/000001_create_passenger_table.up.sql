@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS passengers(
     drop_loc integer,
     rating real,
     in_ride BOOLEAN NOT NULL DEFAULT FALSE,
+    with_driver DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

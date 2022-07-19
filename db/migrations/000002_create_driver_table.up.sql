@@ -4,5 +4,6 @@ CREATE TABLE IF NOT EXISTS drivers(
     loc integer,
     available BOOLEAN NOT NULL DEFAULT TRUE,
     rating real,
+    with_passenger DEFAULT NULL,
     last_trip_end_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

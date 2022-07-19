@@ -3,13 +3,14 @@ package models
 // Passenger data model
 
 type Passenger struct {
-	ID        int     `json:"id"`
-	Name      string  `json:"name"`
-	PickupLoc int     `json:"pick_up_loc"`
-	DropLoc   int     `json:"drop_loc"`
-	Rating    float64 `json:"rating"`
-	InRide    bool    `json:"in_ride"`
-	CreatedAt string  `json:"created_at"`
+	ID         int     `json:"id"`
+	Name       string  `json:"name"`
+	PickupLoc  int     `json:"pick_up_loc"`
+	DropLoc    int     `json:"drop_loc"`
+	Rating     float64 `json:"rating"`
+	InRide     bool    `json:"in_ride"`
+	WithDriver int     `json:"with_driver"`
+	CreatedAt  string  `json:"created_at"`
 }
 
 type PassengerList struct {
@@ -33,6 +34,7 @@ type Driver struct {
 	Loc           int     `json:"loc"`
 	Available     bool    `json:"available"`
 	Rating        float64 `json:"rating"`
+	WithPassenger int     `json:"with_passenger"`
 	LastTripEndAt string  `json:"last_trip_end_at"`
 }
 
