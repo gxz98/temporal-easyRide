@@ -214,6 +214,68 @@ func (db *Database) UpdatePassengerRating(passengerId int, newRating float64) er
 	}
 }
 
+func (db *Database) AddUser(userName string, password string, role string) error {
+	query := `INSERT INTO users (name, password, role) VALUES ($1, $2, $3)`
+	_, err := db.Conn.Exec(query, userName, password, role)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) GetUserPassword(userName string) (storedCreds *models.Credentials, e error) {
+	query := `SELECT password FROM users WHERE username=$1`
+	err := db.Conn.QueryRow(query, userName).Scan(storedCreds.Password)
+	if err != nil {
+		return storedCreds, err
+	}
+	return storedCreds, nil
+}
+
+func (db *Database) UpdateWorkFlowID(userName string, workflowId string) error {
+	query := `UPDATE users SET workflow_id=$1 WHERE username=$2;`
+	_, err := db.Conn.Exec(query, workflowId, userName)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) GetWorkFlowID(userName string) (id string, e error) {
+	query := `SELECT workflow_id FROM users WHERE username=$1;`
+	err := db.Conn.QueryRow(query, userName).Scan(&id)
+	if err != nil {
+		return id, err
+	}
+	return id, nil
+}
+
+func (db *Database) GetRating(userName string) (rating float64, e error) {
+	query := `SELECT rating FROM users WHERE username=$1`
+	err := db.Conn.QueryRow(query, userName).Scan(&rating)
+	if err != nil {
+		return rating, err
+	}
+	return rating, nil
+}
+
+func (db *Database) GetPassengerStatus(userName string) (status bool, e error) {
+	query := `SELECT in_ride FROM passengers WHERE username=$1`
+	err := db.Conn.QueryRow(query, userName).Scan(&status)
+	if err != nil {
+		return false, err
+	}
+	return status, nil
+}
+
+func (db *Database) GetMatchedDriver(pName string) (driverName string, e error) {
+	var driverID int
+	query := `SELECT with_driver FROM passengers WHERE username=$1`
+	db.Conn.QueryRow(query, pName).Scan(&driverID)
+	db.Conn.QueryRow(`SELECT name FROM drivers WHERE id=$1`, driverID).Scan(&driverName)
+	return driverName, nil
+}
+
 func main() {
 	db, err := Initialize(USR, PASS, DB)
 	if err != nil {
