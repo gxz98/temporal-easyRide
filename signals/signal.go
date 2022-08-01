@@ -10,31 +10,34 @@ import (
 // signal definitions
 
 const (
-	SIGNAL_MATCH   = "signal_match"
+	MATCH_SIGNAL   = "signal_match"
 	SIGNAL_PAYMENT = "signal_payment"
 )
 
-func SendMatchSignal(workflowID string, matchStatus bool) {
-	temporalClient, err := client.NewLazyClient(client.Options{})
+func SendMatchSignal(workflowID string, matchStatus bool) error {
+	temporalClient, err := client.Dial(client.Options{})
 	if err != nil {
-		log.Fatalln("Unable to create Temporal client ", err)
+		log.Println("Unable to create Temporal client", err)
+		return err
 	}
-	err = temporalClient.SignalWorkflow(context.Background(), workflowID, "", SIGNAL_MATCH, matchStatus)
+	err = temporalClient.SignalWorkflow(context.Background(), workflowID, "", MATCH_SIGNAL, matchStatus)
 	if err != nil {
-		log.Fatalln("Error signaling workflow in execution ", err)
+		log.Println("Error signaling workflow in execution ", err)
+		return err
 	}
+	return nil
 }
 
-func ReceiveMatchSignal(ctx workflow.Context, signalName string) (matchStatus bool) {
-	res := workflow.GetSignalChannel(ctx, signalName).Receive(ctx, &matchStatus)
+func ReceiveSignal(ctx workflow.Context, signalName string) (status bool) {
+	res := workflow.GetSignalChannel(ctx, signalName).Receive(ctx, &status)
 	if !res {
-		log.Fatalln("Match signal channel is closed. Cannot receive match status. ")
+		log.Fatalf("%s channel is closed. Cannot receive status. ", signalName)
 	}
 	return
 }
 
 func SendPaymentSignal(workflowID string, paymentStatus bool) {
-	temporalClient, err := client.NewLazyClient(client.Options{})
+	temporalClient, err := client.Dial(client.Options{})
 	if err != nil {
 		log.Fatalln("Unable to create Temporal client ", err)
 	}
@@ -42,12 +45,4 @@ func SendPaymentSignal(workflowID string, paymentStatus bool) {
 	if err != nil {
 		log.Fatalln("Error signaling workflow in execution ", err)
 	}
-}
-
-func ReceivePaymentSignal(ctx workflow.Context, signalName string) (paymentStatus bool) {
-	res := workflow.GetSignalChannel(ctx, signalName).Receive(ctx, &paymentStatus)
-	if !res {
-		log.Fatalln("Payment signal channel is closed. Cannot receive match status. ")
-	}
-	return
 }
