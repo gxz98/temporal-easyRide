@@ -5,21 +5,15 @@ import (
 	"easyRide/activities/hungarian"
 	postgres "easyRide/db"
 	"easyRide/models"
+	"easyRide/signals"
 	"go.temporal.io/sdk/activity"
 	"math"
 	"time"
 )
 
-const (
-	HOST = "localhost"
-	PORT = 5432
-	USR  = "temporal"
-	PASS = "temporal"
-	DB   = "test"
-)
-
 func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 	activity.GetLogger(ctx).Info("Match job running.", "lastRunTime_exclude", lastRunTime, "thisRunTime_include", thisRunTime)
+	// TODO: make sure the workflow retry
 	db, err := postgres.Initialize(USR, PASS, DB)
 	if err != nil {
 		activity.GetLogger(ctx).Error("Database connection failed", "Error", err)
@@ -42,18 +36,23 @@ func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 		return errG
 	}
 	// update passenger and driver status in the database
+	// notify corresponding workflow the matching result
 	for p_idx, d_idx := range res {
 		passenger := p.Passengers[p_idx]
 		driver := d.Drivers[d_idx]
-		errPS := db.UpdatePassengerStatus(passenger.ID, &driver)
-		if errPS != nil {
-			return errPS
+		if err := db.UpdatePassengerStatus(passenger.ID, &driver); err != nil {
+			return nil
 		}
-		errDS := db.UpdateDriverAvailability(driver.ID, &passenger)
-		if errDS != nil {
-			return errDS
+		if err := db.UpdateDriverAvailability(driver.ID, &passenger); err != nil {
+			return err
 		}
-
+		workflowID, err := db.GetWorkFlowID(passenger.Name)
+		if err != nil {
+			return err
+		}
+		if err := signals.SendMatchSignal(workflowID, true); err != nil {
+			return err
+		}
 	}
 	return nil
 }
