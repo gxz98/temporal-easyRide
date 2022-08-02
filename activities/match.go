@@ -43,7 +43,7 @@ func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 		if err := db.UpdatePassengerStatus(passenger.ID, &driver); err != nil {
 			return nil
 		}
-		if err := db.UpdateDriverAvailability(driver.ID, &passenger); err != nil {
+		if err := db.UpdateDriverStatus(driver.ID, &passenger); err != nil {
 			return err
 		}
 		workflowID, err := db.GetWorkFlowID(passenger.Name)

@@ -119,9 +119,9 @@ func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
 }
 
 // DeletePassenger delete the client after the trip is end.
-func (db *Database) DeletePassenger(passengerID int) error {
-	query := `DELETE FROM passengers WHERE id = $1;`
-	_, err := db.Conn.Exec(query, passengerID)
+func (db *Database) DeletePassenger(passengerName string) error {
+	query := `DELETE FROM passengers WHERE name = $1;`
+	_, err := db.Conn.Exec(query, passengerName)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -131,9 +131,9 @@ func (db *Database) DeletePassenger(passengerID int) error {
 }
 
 // DeleteDriver delete the driver when they choose to offline.
-func (db *Database) DeleteDriver(driverID int) error {
-	query := `DELETE FROM drivers WHERE id = $1;`
-	_, err := db.Conn.Exec(query, driverID)
+func (db *Database) DeleteDriver(driverName string) error {
+	query := `DELETE FROM drivers WHERE name = $1;`
+	_, err := db.Conn.Exec(query, driverName)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -142,8 +142,8 @@ func (db *Database) DeleteDriver(driverID int) error {
 	}
 }
 
-// UpdateDriverAvailability update driver available status.
-func (db *Database) UpdateDriverAvailability(driverId int, withPassenger *models.Passenger) error {
+// UpdateDriverStatus update driver available status.
+func (db *Database) UpdateDriverStatus(driverId int, withPassenger *models.Passenger) error {
 	query := `UPDATE drivers SET available=NOT available, with_passenger=$2 WHERE id=$1;`
 	_, err := db.Conn.Exec(query, driverId, (*withPassenger).ID)
 	switch err {
@@ -180,8 +180,13 @@ func (db *Database) UpdateLastTripEndTime(driverId int) error {
 
 // UpdateDriverRating updates the driver's rating when receiving passengers' feedback.
 func (db *Database) UpdateDriverRating(driverId int, newRating float64) error {
+	var prevRating float64
+	err := db.Conn.QueryRow(`SELECT rating FROM drivers WHERE id=$1`, driverId).Scan(&prevRating)
+	if err != nil {
+		prevRating = 5.0
+	}
 	query := `UPDATE drivers SET rating=$1 WHERE id=$2;`
-	_, err := db.Conn.Exec(query, newRating, driverId)
+	_, err = db.Conn.Exec(query, (newRating+prevRating)/2, driverId)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -204,8 +209,13 @@ func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Dr
 
 // UpdatePassengerRating updates passengers' rating when receiving feedback from drivers.
 func (db *Database) UpdatePassengerRating(passengerId int, newRating float64) error {
+	var prevRating float64
+	err := db.Conn.QueryRow(`SELECT rating FROM passengers WHERE id=$1`, passengerId).Scan(&prevRating)
+	if err != nil {
+		prevRating = 5.0
+	}
 	query := `UPDATE passengers SET rating=$1 WHERE id=$2;`
-	_, err := db.Conn.Exec(query, newRating, passengerId)
+	_, err = db.Conn.Exec(query, newRating, passengerId)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -259,6 +269,43 @@ func (db *Database) GetRating(userName string) (rating float64, e error) {
 	return rating, nil
 }
 
+func (db *Database) UploadPassengerRating(name string) error {
+	var rating float64
+	err := db.Conn.QueryRow(`SELECT rating FROM passengers WHERE name=$1`, name).Scan(&rating)
+	if err != nil {
+		return err
+	}
+	query := `UPDATE users SET rating=$1 WHERE username=$2`
+	_, err = db.Conn.Exec(query, rating, name)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) UploadDriverRating(name string) error {
+	var rating float64
+	err := db.Conn.QueryRow(`SELECT rating FROM drivers WHERE name=$1`, name).Scan(&rating)
+	if err != nil {
+		return err
+	}
+	query := `UPDATE users SET rating=$1 WHERE username=$2`
+	_, err = db.Conn.Exec(query, rating, name)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (db *Database) GetRole(userName string) (role string, e error) {
+	query := `SELECT role FROM users WHERE username=$1`
+	err := db.Conn.QueryRow(query, userName).Scan(&role)
+	if err != nil {
+		return role, err
+	}
+	return role, nil
+}
+
 func (db *Database) GetPassengerStatus(userName string) (status bool, e error) {
 	query := `SELECT in_ride FROM passengers WHERE username=$1`
 	err := db.Conn.QueryRow(query, userName).Scan(&status)
@@ -268,90 +315,100 @@ func (db *Database) GetPassengerStatus(userName string) (status bool, e error) {
 	return status, nil
 }
 
-func (db *Database) GetMatchedDriver(pName string) (driverName string, e error) {
-	var driverID int
+func (db *Database) GetMatchedDriver(pName string) (driverID int, e error) {
 	query := `SELECT with_driver FROM passengers WHERE username=$1`
-	db.Conn.QueryRow(query, pName).Scan(&driverID)
-	db.Conn.QueryRow(`SELECT name FROM drivers WHERE id=$1`, driverID).Scan(&driverName)
-	return driverName, nil
+	err := db.Conn.QueryRow(query, pName).Scan(&driverID)
+	if err != nil {
+		return 0, err
+	}
+	return driverID, nil
 }
 
-func main() {
-	db, err := Initialize(USR, PASS, DB)
+func (db *Database) GetMatchedPassenger(dName string) (passengerID int, e error) {
+	query := `SELECT with_passenger FROM drivers WHERE username=$1`
+	err := db.Conn.QueryRow(query, dName).Scan(&passengerID)
 	if err != nil {
-		log.Println("Database connection failed")
-		log.Println(err)
+		return 0, err
 	}
-
-	passenger1 := &models.Passenger{}
-	passenger1.Init("passenger_1", 3, 6, 4.8, time.Now().String())
-	err = db.AddPassenger(passenger1)
-	if err != nil {
-		return
-	}
-	log.Println("Adding client", passenger1)
-
-	passenger2 := &models.Passenger{}
-	passenger2.Init("passenger_2", 1, 9, 4.6, time.Now().String())
-	err = db.AddPassenger(passenger2)
-	if err != nil {
-		return
-	}
-	log.Println("Adding client", passenger2)
-
-	driver1 := &models.Driver{}
-	driver1.Init("driver_1", 4, 4.9, time.Now().String())
-	err = db.AddDriver(driver1)
-	if err != nil {
-		return
-	}
-	log.Println("Adding driver", driver1)
-
-	driver2 := &models.Driver{}
-	driver2.Init("driver_2", 7, 4.9, time.Now().String())
-	err = db.AddDriver(driver2)
-	if err != nil {
-		return
-	}
-	log.Println("Adding driver", driver2)
-
-	// driver1 match with passenger1
-	log.Println("start trip.....")
-	err = db.UpdatePassengerStatus(passenger1.ID, driver1)
-	if err != nil {
-		return
-	}
-	log.Println("Changed client state", passenger1)
-
-	err = db.UpdateDriverAvailability(driver1.ID, passenger1)
-	if err != nil {
-		return
-	}
-	log.Println("Changed driver state", driver1)
-
-	// check unmatched passengers and drivers
-	drivers, _ := db.GetAvailableDrivers()
-	fmt.Println("available drivers: ", drivers.Drivers[0].Name)
-
-	passengers, _ := db.GetWaitingPassengers()
-	fmt.Println("waiting passengers ", passengers.Passengers[0].Name)
-
-	//// trip end
-	log.Println("end trip.....")
-	err = db.UpdateDriverAvailability(driver1.ID, passenger1)
-	if err != nil {
-		return
-	}
-	log.Println("Changed driver state", driver1)
-	err = db.UpdateDriverLoc(driver1.ID, 6)
-	if err != nil {
-		return
-	}
-	log.Println("Changed driver location", driver1)
-	err = db.DeletePassenger(passenger1.ID)
-	if err != nil {
-		return
-	}
-	log.Println("delete client", passenger1)
-
+	return passengerID, nil
 }
+
+//func main() {
+//	db, err := Initialize(USR, PASS, DB)
+//	if err != nil {
+//		log.Println("Database connection failed")
+//		log.Println(err)
+//	}
+//
+//	passenger1 := &models.Passenger{}
+//	passenger1.Init("passenger_1", 3, 6, 4.8, time.Now().String())
+//	err = db.AddPassenger(passenger1)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Adding client", passenger1)
+//
+//	passenger2 := &models.Passenger{}
+//	passenger2.Init("passenger_2", 1, 9, 4.6, time.Now().String())
+//	err = db.AddPassenger(passenger2)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Adding client", passenger2)
+//
+//	driver1 := &models.Driver{}
+//	driver1.Init("driver_1", 4, 4.9, time.Now().String())
+//	err = db.AddDriver(driver1)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Adding driver", driver1)
+//
+//	driver2 := &models.Driver{}
+//	driver2.Init("driver_2", 7, 4.9, time.Now().String())
+//	err = db.AddDriver(driver2)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Adding driver", driver2)
+//
+//	// driver1 match with passenger1
+//	log.Println("start trip.....")
+//	err = db.UpdatePassengerStatus(passenger1.ID, driver1)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Changed client state", passenger1)
+//
+//	err = db.UpdateDriverStatus(driver1.ID, passenger1)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Changed driver state", driver1)
+//
+//	// check unmatched passengers and drivers
+//	drivers, _ := db.GetAvailableDrivers()
+//	fmt.Println("available drivers: ", drivers.Drivers[0].Name)
+//
+//	passengers, _ := db.GetWaitingPassengers()
+//	fmt.Println("waiting passengers ", passengers.Passengers[0].Name)
+//
+//	//// trip end
+//	log.Println("end trip.....")
+//	err = db.UpdateDriverStatus(driver1.ID, passenger1)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Changed driver state", driver1)
+//	err = db.UpdateDriverLoc(driver1.ID, 6)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("Changed driver location", driver1)
+//	err = db.DeletePassenger(passenger1.ID)
+//	if err != nil {
+//		return
+//	}
+//	log.Println("delete client", passenger1)
+//
+//}

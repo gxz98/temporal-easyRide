@@ -48,3 +48,19 @@ func (d *Driver) Init(name string, loc int, rating float64, lastTripEndAt string
 	d.Rating = rating
 	d.LastTripEndAt = lastTripEndAt
 }
+
+type Credentials struct {
+	Password string `json:"password"`
+	Username string `json:"username"`
+}
+
+type PassengerLocation struct {
+	Name      string `json:"name"`
+	PickupLoc int    `json:"pick_up_loc"`
+	DropLoc   int    `json:"drop_loc"`
+}
+
+type DriverLocation struct {
+	Name string `json:"name"`
+	Loc  int    `json:"loc"`
+}
