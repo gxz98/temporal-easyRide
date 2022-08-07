@@ -5,9 +5,11 @@ package models
 type Passenger struct {
 	ID         int     `json:"id"`
 	Name       string  `json:"name"`
+	Password   string  `json:"password"`
 	PickupLoc  int     `json:"pick_up_loc"`
 	DropLoc    int     `json:"drop_loc"`
 	Rating     float64 `json:"rating"`
+	WorkflowID string  `json:"workflow_id"`
 	InRide     bool    `json:"in_ride"`
 	WithDriver int     `json:"with_driver"`
 	CreatedAt  string  `json:"created_at"`
@@ -31,6 +33,7 @@ func (p *Passenger) Init(name string, pickupLoc int,
 type Driver struct {
 	ID            int     `json:"id"`
 	Name          string  `json:"name"`
+	Password      string  `json:"password"`
 	Loc           int     `json:"loc"`
 	Available     bool    `json:"available"`
 	Rating        float64 `json:"rating"`
@@ -54,13 +57,15 @@ type Credentials struct {
 	Username string `json:"username"`
 }
 
-type PassengerLocation struct {
+type PassengerRequestBody struct {
 	Name      string `json:"name"`
+	ID        int    `json:"id"`
 	PickupLoc int    `json:"pick_up_loc"`
 	DropLoc   int    `json:"drop_loc"`
 }
 
-type DriverLocation struct {
+type DriverRequestBody struct {
 	Name string `json:"name"`
+	ID   int    `json:"id"`
 	Loc  int    `json:"loc"`
 }

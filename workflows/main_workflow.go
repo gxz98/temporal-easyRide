@@ -9,7 +9,7 @@ import (
 )
 
 // MainWorkFlow starts after the passenger logging in.
-func MainWorkFlow(ctx workflow.Context, passengerName string) error {
+func MainWorkFlow(ctx workflow.Context, passengerID int) error {
 	ao := workflow.ActivityOptions{
 		// The trip can be long-time, set heartbeat instead of time to close
 		HeartbeatTimeout: 1 * time.Minute,
@@ -21,21 +21,22 @@ func MainWorkFlow(ctx workflow.Context, passengerName string) error {
 		if status == true {
 			break
 		} else {
-			log.Printf("Cannot match passenger %s, trying again.", passengerName)
+			log.Printf("Cannot match passenger %d, trying again.", passengerID)
 		}
 	}
 
-	log.Printf("Succesfully found driver for passenger %s", passengerName)
-	err := workflow.ExecuteActivity(ctx, activities.InTrip, passengerName).Get(ctx, nil)
+	log.Printf("Succesfully found driver for passenger %d", passengerID)
+	err := workflow.ExecuteActivity(ctx, activities.InTrip, passengerID).Get(ctx, nil)
 	if err != nil {
 		return err
 	}
+	log.Printf("Driver please rate passenger %d", passengerID)
 	// driver rate passenger
 	err = workflow.Sleep(ctx, 15*time.Second)
 	if err != nil {
 		return err
 	}
-	err = workflow.ExecuteActivity(ctx, activities.Arrive, passengerName).Get(ctx, nil)
+	err = workflow.ExecuteActivity(ctx, activities.Arrive, passengerID).Get(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -50,14 +51,15 @@ func MainWorkFlow(ctx workflow.Context, passengerName string) error {
 	}
 
 	// passenger rate driver
+	log.Printf("Passenger %d please rate driver", passengerID)
 	err = workflow.Sleep(ctx, 15*time.Second)
 	if err != nil {
 		return err
 	}
-	err = workflow.ExecuteActivity(ctx, activities.UpdatePassengerInfo, passengerName).Get(ctx, nil)
+
+	err = workflow.ExecuteActivity(ctx, activities.PassengerEndTrip, passengerID).Get(ctx, nil)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }

@@ -13,7 +13,6 @@ import (
 
 func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 	activity.GetLogger(ctx).Info("Match job running.", "lastRunTime_exclude", lastRunTime, "thisRunTime_include", thisRunTime)
-	// TODO: make sure the workflow retry
 	db, err := postgres.Initialize(USR, PASS, DB)
 	if err != nil {
 		activity.GetLogger(ctx).Error("Database connection failed", "Error", err)
@@ -46,7 +45,7 @@ func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 		if err := db.UpdateDriverStatus(driver.ID, &passenger); err != nil {
 			return err
 		}
-		workflowID, err := db.GetWorkFlowID(passenger.Name)
+		workflowID, err := db.GetWorkFlowID(passenger.ID)
 		if err != nil {
 			return err
 		}

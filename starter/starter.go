@@ -29,7 +29,7 @@ func StartMatchWorkflow() {
 	log.Println("Started matching workflow", "WorkflowID", w.GetID(), "RunID", w.GetRunID())
 }
 
-func StartMainWorkflow(workflowID string, passengerName string) {
+func StartMainWorkflow(workflowID string, passengerID int) {
 	c, err := client.Dial(client.Options{
 		HostPort: client.DefaultHostPort,
 	})
@@ -44,7 +44,7 @@ func StartMainWorkflow(workflowID string, passengerName string) {
 		ID:        workflowID,
 	}
 
-	w, err := c.ExecuteWorkflow(context.Background(), workflowOptions, workflows.MainWorkFlow, passengerName)
+	w, err := c.ExecuteWorkflow(context.Background(), workflowOptions, workflows.MainWorkFlow, passengerID)
 	if err != nil {
 		log.Fatalln("Unable to execute workflow", err)
 	}

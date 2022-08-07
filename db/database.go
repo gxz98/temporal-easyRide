@@ -42,44 +42,21 @@ func Initialize(username, password, database string) (Database, error) {
 	return db, nil
 }
 
-// AddPassenger add a client who starts a trip into the database.
-func (db *Database) AddPassenger(passenger *models.Passenger) error {
-	var id int
-	var createdAt string
-	var inRide bool
-	query := `INSERT INTO passengers (name, pick_up_loc, drop_loc, rating) VALUES ($1, $2, $3, $4) RETURNING id, created_at, in_ride`
-	err := db.Conn.QueryRow(query, passenger.Name, passenger.PickupLoc, passenger.DropLoc, passenger.Rating).Scan(&id, &createdAt, &inRide)
+// Driver database
+
+func (db *Database) AddDriver(name string, password string) error {
+	query := `INSERT INTO drivers (name, password) VALUES ($1, $2)`
+	_, err := db.Conn.Query(query, name, password)
 	if err != nil {
 		return err
 	}
-	passenger.ID = id
-	passenger.CreatedAt = createdAt
-	passenger.InRide = inRide
 	return nil
 }
-
-// AddDriver add a driver who starts to work into the database.
-func (db *Database) AddDriver(driver *models.Driver) error {
-	var id int
-	var available bool
-	var lastTripEndAt string
-	query := `INSERT INTO drivers (name, loc, rating) VALUES ($1, $2, $3) RETURNING id, available, last_trip_end_at`
-	err := db.Conn.QueryRow(query, driver.Name, driver.Loc, driver.Rating).Scan(&id, &available, &lastTripEndAt)
-	if err != nil {
-		return err
-	}
-	driver.ID = id
-	driver.Available = available
-	driver.LastTripEndAt = lastTripEndAt
-	return nil
-}
-
-// every 10 second, fetch unmatched passengers and drivers from db, and run matching algorithm
 
 // GetAvailableDrivers fetch all available drivers in descending order of their waiting time.
 func (db *Database) GetAvailableDrivers() (models.DriverList, error) {
 	list := models.DriverList{}
-	query := `SELECT * FROM drivers WHERE available=TRUE ORDER BY last_trip_end_at ASC`
+	query := `SELECT * FROM drivers WHERE available=TRUE AND loc>=0 ORDER BY last_trip_end_at ASC`
 	rows, err := db.Conn.Query(query)
 	if err != nil {
 		return list, err
@@ -97,51 +74,6 @@ func (db *Database) GetAvailableDrivers() (models.DriverList, error) {
 	return list, nil
 }
 
-// GetWaitingPassengers fetch all unmatched passengers in descending order of their waiting time.
-func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
-	list := models.PassengerList{}
-	query := `SELECT * FROM passengers WHERE in_ride=FALSE ORDER BY created_at ASC`
-	rows, err := db.Conn.Query(query)
-	if err != nil {
-		return list, err
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var passenger models.Passenger
-		if err := rows.Scan(&passenger.ID, &passenger.Name, &passenger.PickupLoc,
-			&passenger.DropLoc, &passenger.Rating, &passenger.InRide, &passenger.WithDriver, &passenger.CreatedAt); err != nil {
-			return list, err
-		}
-		list.Passengers = append(list.Passengers, passenger)
-	}
-	return list, nil
-}
-
-// DeletePassenger delete the client after the trip is end.
-func (db *Database) DeletePassenger(passengerName string) error {
-	query := `DELETE FROM passengers WHERE name = $1;`
-	_, err := db.Conn.Exec(query, passengerName)
-	switch err {
-	case sql.ErrNoRows:
-		return ErrNoMatch
-	default:
-		return err
-	}
-}
-
-// DeleteDriver delete the driver when they choose to offline.
-func (db *Database) DeleteDriver(driverName string) error {
-	query := `DELETE FROM drivers WHERE name = $1;`
-	_, err := db.Conn.Exec(query, driverName)
-	switch err {
-	case sql.ErrNoRows:
-		return ErrNoMatch
-	default:
-		return err
-	}
-}
-
 // UpdateDriverStatus update driver available status.
 func (db *Database) UpdateDriverStatus(driverId int, withPassenger *models.Passenger) error {
 	query := `UPDATE drivers SET available=NOT available, with_passenger=$2 WHERE id=$1;`
@@ -155,15 +87,22 @@ func (db *Database) UpdateDriverStatus(driverId int, withPassenger *models.Passe
 }
 
 // UpdateDriverLoc updates the driver's location regularly.
-func (db *Database) UpdateDriverLoc(driverId int, newLoc int) error {
+func (db *Database) UpdateDriverLoc(driverID int, loc int) error {
 	query := `UPDATE drivers SET loc=$1 WHERE id=$2;`
-	_, err := db.Conn.Exec(query, newLoc, driverId)
-	switch err {
-	case sql.ErrNoRows:
-		return ErrNoMatch
-	default:
+	_, err := db.Conn.Exec(query, loc, driverID)
+	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (db *Database) SetDriverOffline(DriverID int) error {
+	query := `UPDATE drivers SET loc=-100,available=FALSE WHERE id=$1;`
+	_, err := db.Conn.Exec(query, DriverID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdateLastTripEndTime updates the driver's last trip end time.
@@ -195,6 +134,47 @@ func (db *Database) UpdateDriverRating(driverId int, newRating float64) error {
 	}
 }
 
+func (db *Database) GetMatchedPassenger(driverId int) (passengerID int, e error) {
+	query := `SELECT with_passenger FROM drivers WHERE id=$1`
+	err := db.Conn.QueryRow(query, driverId).Scan(&passengerID)
+	if err != nil {
+		return 0, err
+	}
+	return passengerID, nil
+}
+
+// Passenger database
+
+func (db *Database) AddPassenger(name string, password string) error {
+	query := `INSERT INTO passengers (name, password) VALUES ($1, $2)`
+	_, err := db.Conn.Query(query, name, password)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetWaitingPassengers fetch all unmatched passengers in descending order of their waiting time.
+func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
+	list := models.PassengerList{}
+	query := `SELECT * FROM passengers WHERE in_ride=FALSE AND drop_loc>=0 ORDER BY created_at ASC`
+	rows, err := db.Conn.Query(query)
+	if err != nil {
+		return list, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var passenger models.Passenger
+		if err := rows.Scan(&passenger.ID, &passenger.Name, &passenger.PickupLoc,
+			&passenger.DropLoc, &passenger.Rating, &passenger.InRide, &passenger.WithDriver, &passenger.CreatedAt); err != nil {
+			return list, err
+		}
+		list.Passengers = append(list.Passengers, passenger)
+	}
+	return list, nil
+}
+
 // UpdatePassengerStatus update passengers' status.
 func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Driver) error {
 	query := `UPDATE passengers SET in_ride=NOT in_ride, with_driver=$2 WHERE id=$1;`
@@ -205,6 +185,15 @@ func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Dr
 	default:
 		return err
 	}
+}
+
+func (db *Database) SetPassengerTripEnd(passengerID int) error {
+	query := `UPDATE passengers SET drop_loc=-100,in_ride=FALSE WHERE id=$1;`
+	_, err := db.Conn.Exec(query, passengerID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // UpdatePassengerRating updates passengers' rating when receiving feedback from drivers.
@@ -224,113 +213,63 @@ func (db *Database) UpdatePassengerRating(passengerId int, newRating float64) er
 	}
 }
 
-func (db *Database) AddUser(userName string, password string, role string) error {
-	query := `INSERT INTO users (name, password, role) VALUES ($1, $2, $3)`
-	_, err := db.Conn.Exec(query, userName, password, role)
+func (db *Database) UpdateWorkFlowID(passengerId int, workflowId string) error {
+	query := `UPDATE passengers SET workflow_id=$1 WHERE id=$2;`
+	_, err := db.Conn.Exec(query, workflowId, passengerId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (db *Database) GetUserPassword(userName string) (storedCreds *models.Credentials, e error) {
-	query := `SELECT password FROM users WHERE username=$1`
-	err := db.Conn.QueryRow(query, userName).Scan(storedCreds.Password)
-	if err != nil {
-		return storedCreds, err
-	}
-	return storedCreds, nil
-}
-
-func (db *Database) UpdateWorkFlowID(userName string, workflowId string) error {
-	query := `UPDATE users SET workflow_id=$1 WHERE username=$2;`
-	_, err := db.Conn.Exec(query, workflowId, userName)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (db *Database) GetWorkFlowID(userName string) (id string, e error) {
-	query := `SELECT workflow_id FROM users WHERE username=$1;`
-	err := db.Conn.QueryRow(query, userName).Scan(&id)
+func (db *Database) GetWorkFlowID(passengerId int) (id string, e error) {
+	query := `SELECT workflow_id FROM passengers WHERE id=$1;`
+	err := db.Conn.QueryRow(query, passengerId).Scan(&id)
 	if err != nil {
 		return id, err
 	}
 	return id, nil
 }
 
-func (db *Database) GetRating(userName string) (rating float64, e error) {
-	query := `SELECT rating FROM users WHERE username=$1`
-	err := db.Conn.QueryRow(query, userName).Scan(&rating)
-	if err != nil {
-		return rating, err
-	}
-	return rating, nil
-}
-
-func (db *Database) UploadPassengerRating(name string) error {
-	var rating float64
-	err := db.Conn.QueryRow(`SELECT rating FROM passengers WHERE name=$1`, name).Scan(&rating)
-	if err != nil {
-		return err
-	}
-	query := `UPDATE users SET rating=$1 WHERE username=$2`
-	_, err = db.Conn.Exec(query, rating, name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (db *Database) UploadDriverRating(name string) error {
-	var rating float64
-	err := db.Conn.QueryRow(`SELECT rating FROM drivers WHERE name=$1`, name).Scan(&rating)
-	if err != nil {
-		return err
-	}
-	query := `UPDATE users SET rating=$1 WHERE username=$2`
-	_, err = db.Conn.Exec(query, rating, name)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (db *Database) GetRole(userName string) (role string, e error) {
-	query := `SELECT role FROM users WHERE username=$1`
-	err := db.Conn.QueryRow(query, userName).Scan(&role)
-	if err != nil {
-		return role, err
-	}
-	return role, nil
-}
-
-func (db *Database) GetPassengerStatus(userName string) (status bool, e error) {
-	query := `SELECT in_ride FROM passengers WHERE username=$1`
-	err := db.Conn.QueryRow(query, userName).Scan(&status)
-	if err != nil {
-		return false, err
-	}
-	return status, nil
-}
-
-func (db *Database) GetMatchedDriver(pName string) (driverID int, e error) {
-	query := `SELECT with_driver FROM passengers WHERE username=$1`
-	err := db.Conn.QueryRow(query, pName).Scan(&driverID)
+func (db *Database) GetMatchedDriver(passengerId int) (driverID int, e error) {
+	query := `SELECT with_driver FROM passengers WHERE id=$1`
+	err := db.Conn.QueryRow(query, passengerId).Scan(&driverID)
 	if err != nil {
 		return 0, err
 	}
 	return driverID, nil
 }
 
-func (db *Database) GetMatchedPassenger(dName string) (passengerID int, e error) {
-	query := `SELECT with_passenger FROM drivers WHERE username=$1`
-	err := db.Conn.QueryRow(query, dName).Scan(&passengerID)
+func (db *Database) GetDestination(passengerId int) (destination int, e error) {
+	query := `SELECT drop_loc FROM passengers WHERE name=$1`
+	err := db.Conn.QueryRow(query, passengerId).Scan(&destination)
 	if err != nil {
 		return 0, err
 	}
-	return passengerID, nil
+	return destination, nil
+}
+
+func (db *Database) GetPassword(userName string, table string) (password string, id int, e error) {
+	var query string
+	if table == "passenger" {
+		query = `SELECT password,id FROM passengers WHERE name=$1`
+	} else {
+		query = `SELECT password,id FROM drivers WHERE name=$1`
+	}
+	err := db.Conn.QueryRow(query, userName).Scan(&password, &id)
+	if err != nil {
+		return "", 0, err
+	}
+	return password, id, nil
+}
+
+func (db *Database) UpdatePassengerLoc(body *models.PassengerRequestBody) error {
+	query := `UPDATE passengers SET pick_up_loc=$1, drop_loc=$2 WHERE id=$3;`
+	_, err := db.Conn.Exec(query, body.PickupLoc, body.DropLoc, body.ID)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 //func main() {
