@@ -21,7 +21,7 @@ const (
 	PORT = 5432
 	USR  = "temporal"
 	PASS = "temporal"
-	DB   = "test"
+	DB   = "postgres"
 )
 
 var db data.Database
@@ -61,7 +61,7 @@ func main() {
 	//router.HandleFunc("/passenger/report-danger", DangerHandler)
 	//router.HandleFunc("/passenger/cancel", CancelHandler)
 	//router.HandleFunc("/passenger/change-destination", DestinationChangeHandler)
-	log.Fatal(http.ListenAndServe("3310", router))
+	log.Fatal(http.ListenAndServe(":3310", router))
 }
 
 func Start(writer http.ResponseWriter, request *http.Request) {

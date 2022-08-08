@@ -14,7 +14,7 @@ const (
 	PORT = 5432
 	USR  = "temporal"
 	PASS = "temporal"
-	DB   = "test"
+	DB   = "postgres"
 )
 
 // InTrip is the mock process of riding.

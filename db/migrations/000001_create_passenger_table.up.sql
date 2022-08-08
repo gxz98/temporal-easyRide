@@ -7,6 +7,6 @@ CREATE TABLE IF NOT EXISTS passengers(
     rating real DEFAULT 5.0,
     workflow_id VARCHAR(100),
     in_ride BOOLEAN NOT NULL DEFAULT FALSE,
-    with_driver DEFAULT NULL,
+    with_driver integer DEFAULT -1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

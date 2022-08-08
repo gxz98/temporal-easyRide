@@ -22,7 +22,7 @@ func main() {
 	w.RegisterWorkflow(workflows.MainWorkFlow)
 	w.RegisterActivity(activities.InTrip)
 	w.RegisterActivity(activities.Arrive)
-	w.RegisterActivity(activities.UpdatePassengerInfo)
+	w.RegisterActivity(activities.PassengerEndTrip)
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		log.Fatalln(err)
 	}
