@@ -65,7 +65,7 @@ func (db *Database) GetAvailableDrivers() (models.DriverList, error) {
 
 	for rows.Next() {
 		var driver models.Driver
-		if err := rows.Scan(&driver.ID, &driver.Name, &driver.Loc,
+		if err := rows.Scan(&driver.ID, &driver.Name, &driver.Password, &driver.Loc,
 			&driver.Available, &driver.Rating, &driver.WithPassenger, &driver.LastTripEndAt); err != nil {
 			return list, err
 		}
@@ -75,9 +75,9 @@ func (db *Database) GetAvailableDrivers() (models.DriverList, error) {
 }
 
 // UpdateDriverStatus update driver available status.
-func (db *Database) UpdateDriverStatus(driverId int, withPassenger *models.Passenger) error {
-	query := `UPDATE drivers SET available=NOT available, with_passenger=$2 WHERE id=$1;`
-	_, err := db.Conn.Exec(query, driverId, (*withPassenger).ID)
+func (db *Database) UpdateDriverStatus(driverId int, withPassenger *models.Passenger, status bool) error {
+	query := `UPDATE drivers SET available=$3, with_passenger=$2 WHERE id=$1;`
+	_, err := db.Conn.Exec(query, driverId, (*withPassenger).ID, status)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -166,8 +166,9 @@ func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
 
 	for rows.Next() {
 		var passenger models.Passenger
-		if err := rows.Scan(&passenger.ID, &passenger.Name, &passenger.PickupLoc,
-			&passenger.DropLoc, &passenger.Rating, &passenger.InRide, &passenger.WithDriver, &passenger.CreatedAt); err != nil {
+		if err := rows.Scan(&passenger.ID, &passenger.Name, &passenger.Password, &passenger.PickupLoc,
+			&passenger.DropLoc, &passenger.Rating, &passenger.WorkflowID, &passenger.InRide,
+			&passenger.WithDriver, &passenger.CreatedAt); err != nil {
 			return list, err
 		}
 		list.Passengers = append(list.Passengers, passenger)
@@ -176,9 +177,9 @@ func (db *Database) GetWaitingPassengers() (models.PassengerList, error) {
 }
 
 // UpdatePassengerStatus update passengers' status.
-func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Driver) error {
-	query := `UPDATE passengers SET in_ride=NOT in_ride, with_driver=$2 WHERE id=$1;`
-	_, err := db.Conn.Exec(query, passengerId, (*withDriver).ID)
+func (db *Database) UpdatePassengerStatus(passengerId int, withDriver *models.Driver, status bool) error {
+	query := `UPDATE passengers SET in_ride=$3, with_driver=$2 WHERE id=$1;`
+	_, err := db.Conn.Exec(query, passengerId, (*withDriver).ID, status)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -204,7 +205,7 @@ func (db *Database) UpdatePassengerRating(passengerId int, newRating float64) er
 		prevRating = 5.0
 	}
 	query := `UPDATE passengers SET rating=$1 WHERE id=$2;`
-	_, err = db.Conn.Exec(query, newRating, passengerId)
+	_, err = db.Conn.Exec(query, (newRating+prevRating)/2, passengerId)
 	switch err {
 	case sql.ErrNoRows:
 		return ErrNoMatch
@@ -241,7 +242,7 @@ func (db *Database) GetMatchedDriver(passengerId int) (driverID int, e error) {
 }
 
 func (db *Database) GetDestination(passengerId int) (destination int, e error) {
-	query := `SELECT drop_loc FROM passengers WHERE name=$1`
+	query := `SELECT drop_loc FROM passengers WHERE id=$1`
 	err := db.Conn.QueryRow(query, passengerId).Scan(&destination)
 	if err != nil {
 		return 0, err
@@ -278,6 +279,16 @@ func (db *Database) UpdatePassengerLoc(body *models.PassengerRequestBody) error 
 //		log.Println("Database connection failed")
 //		log.Println(err)
 //	}
+//
+//	err = db.UpdatePassengerStatus(1, &models.Driver{}, true)
+//	if err != nil {
+//		return
+//	}
+//
+//	ps, _ := db.GetWaitingPassengers()
+//	fmt.Println(ps)
+//	dr, _ := db.GetAvailableDrivers()
+//	fmt.Println(dr)
 //
 //	passenger1 := &models.Passenger{}
 //	passenger1.Init("passenger_1", 3, 6, 4.8, time.Now().String())
