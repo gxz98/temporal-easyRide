@@ -12,7 +12,8 @@ import (
 func MainWorkFlow(ctx workflow.Context, passengerID int) error {
 	ao := workflow.ActivityOptions{
 		// The trip can be long-time, set heartbeat instead of time to close
-		HeartbeatTimeout: 1 * time.Minute,
+		HeartbeatTimeout:    1 * time.Minute,
+		StartToCloseTimeout: 60 * time.Second,
 	}
 	ctx = workflow.WithActivityOptions(ctx, ao)
 
@@ -30,9 +31,10 @@ func MainWorkFlow(ctx workflow.Context, passengerID int) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Driver please rate passenger %d", passengerID)
+
 	// driver rate passenger
-	err = workflow.Sleep(ctx, 15*time.Second)
+	log.Printf("Driver please rate passenger %d", passengerID)
+	err = workflow.ExecuteActivity(ctx, activities.Rate).Get(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -41,6 +43,7 @@ func MainWorkFlow(ctx workflow.Context, passengerID int) error {
 		return err
 	}
 
+	log.Printf("Passenger %d please make payment...", passengerID)
 	for {
 		status := signals.ReceiveSignal(ctx, signals.SIGNAL_PAYMENT)
 		if status == true {
@@ -52,7 +55,7 @@ func MainWorkFlow(ctx workflow.Context, passengerID int) error {
 
 	// passenger rate driver
 	log.Printf("Passenger %d please rate driver", passengerID)
-	err = workflow.Sleep(ctx, 15*time.Second)
+	err = workflow.ExecuteActivity(ctx, activities.Rate).Get(ctx, nil)
 	if err != nil {
 		return err
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	data "easyRide/db"
 	"easyRide/models"
+	"go.temporal.io/sdk/activity"
 	"log"
 	"math/rand"
 	"time"
@@ -20,9 +21,10 @@ const (
 // InTrip is the mock process of riding.
 func InTrip(ctx context.Context, passengerID int) error {
 	log.Printf("Passenger %d is on a trip to destination....", passengerID)
+	activity.RecordHeartbeat(ctx, "in-trip not response")
 	// generate random number as trip duration time
 	rand.Seed(time.Now().UnixNano())
-	randInt := rand.Int63n(30) + 60
+	randInt := rand.Int63n(60)
 	time.Sleep(time.Duration(randInt) * time.Second)
 	return nil
 }
@@ -41,7 +43,7 @@ func Arrive(ctx context.Context, passengerID int) error {
 		return err
 	}
 	// change the drive availability to true
-	if err := db.UpdateDriverStatus(driverID, &models.Passenger{}); err != nil {
+	if err := db.UpdateDriverStatus(driverID, &models.Passenger{}, true); err != nil {
 		return err
 	}
 	// change the last trip time of driver
@@ -64,5 +66,10 @@ func PassengerEndTrip(ctx context.Context, passengerID int) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func Rate(ctx context.Context) error {
+	time.Sleep(15 * time.Second)
 	return nil
 }

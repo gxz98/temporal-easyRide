@@ -23,6 +23,7 @@ func main() {
 	w.RegisterActivity(activities.InTrip)
 	w.RegisterActivity(activities.Arrive)
 	w.RegisterActivity(activities.PassengerEndTrip)
+	w.RegisterActivity(activities.Rate)
 	if err := w.Run(worker.InterruptCh()); err != nil {
 		log.Fatalln(err)
 	}

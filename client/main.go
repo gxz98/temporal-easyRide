@@ -56,6 +56,8 @@ func main() {
 	router.HandleFunc("/driver/rating/{rating}", DriverRatingHandler)
 
 	router.HandleFunc("/driver/end-work", EndWorkHandler)
+	router.HandleFunc("/passenger/end-trip", EndTripHandler)
+	router.HandleFunc("/match-true/{workflow}", sendMatchTrue)
 	// more features
 	//router.HandleFunc("/driver/confirm-trip/{confirm}", ConfirmTripHandler)
 	//router.HandleFunc("/passenger/report-danger", DangerHandler)
@@ -139,6 +141,7 @@ func PassengerLogInHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(storedPassword), []byte(creds.Password)); err != nil {
 		writer.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
 	// Log in successfully, start the workflow
@@ -209,6 +212,12 @@ func StartWorkHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	err = db.UpdateDriverLoc(driver.ID, driver.Loc)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		writer.Write([]byte(err.Error()))
+		return
+	}
+	err = db.UpdateDriverStatus(driver.ID, &models.Passenger{}, true)
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte(err.Error()))
@@ -305,6 +314,30 @@ func EndWorkHandler(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte(err.Error()))
+		return
+	}
+}
+
+func EndTripHandler(writer http.ResponseWriter, request *http.Request) {
+	passenger := &models.PassengerRequestBody{}
+	if err := json.NewDecoder(request.Body).Decode(passenger); err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte(err.Error()))
+		return
+	}
+	err := db.SetPassengerTripEnd(passenger.ID)
+	if err != nil {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte(err.Error()))
+		return
+	}
+}
+
+func sendMatchTrue(writer http.ResponseWriter, request *http.Request) {
+	vars := mux.Vars(request)
+	id := vars["workflow"]
+	err := signals.SendMatchSignal(id, true)
+	if err != nil {
 		return
 	}
 }

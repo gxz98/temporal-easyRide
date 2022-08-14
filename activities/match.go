@@ -27,6 +27,10 @@ func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 	if errP != nil {
 		activity.GetLogger(ctx).Error("Cannot fetch available driver", "Error", errD)
 	}
+	if len(p.Passengers) == 0 || len(d.Drivers) == 0 {
+		activity.GetLogger(ctx).Info("No drivers/passengers online.")
+		return nil
+	}
 	graph := constructGraph(p, d)
 
 	// apply hungarian algo
@@ -39,10 +43,10 @@ func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 	for p_idx, d_idx := range res {
 		passenger := p.Passengers[p_idx]
 		driver := d.Drivers[d_idx]
-		if err := db.UpdatePassengerStatus(passenger.ID, &driver); err != nil {
+		if err := db.UpdatePassengerStatus(passenger.ID, &driver, true); err != nil {
 			return nil
 		}
-		if err := db.UpdateDriverStatus(driver.ID, &passenger); err != nil {
+		if err := db.UpdateDriverStatus(driver.ID, &passenger, false); err != nil {
 			return err
 		}
 		workflowID, err := db.GetWorkFlowID(passenger.ID)
