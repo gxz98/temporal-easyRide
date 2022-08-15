@@ -10,14 +10,6 @@ import (
 	"time"
 )
 
-const (
-	HOST = "localhost"
-	PORT = 5432
-	USR  = "temporal"
-	PASS = "temporal"
-	DB   = "postgres"
-)
-
 // InTrip is the mock process of riding.
 func InTrip(ctx context.Context, passengerID int) error {
 	log.Printf("Passenger %d is on a trip to destination....", passengerID)
@@ -33,7 +25,7 @@ func InTrip(ctx context.Context, passengerID int) error {
 func Arrive(ctx context.Context, passengerID int) error {
 	log.Printf("Passenger %d arrive the destination...", passengerID)
 	// update the driver status
-	db, err := data.Initialize(USR, PASS, DB)
+	db, err := data.Initialize()
 	if err != nil {
 		log.Fatal("Cannot connect to database.")
 	}
@@ -58,7 +50,7 @@ func Arrive(ctx context.Context, passengerID int) error {
 }
 
 func PassengerEndTrip(ctx context.Context, passengerID int) error {
-	db, err := data.Initialize(USR, PASS, DB)
+	db, err := data.Initialize()
 	if err != nil {
 		log.Fatal("Cannot connect to database.")
 	}

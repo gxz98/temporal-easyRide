@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	data "easyRide/db"
-	models "easyRide/models"
+	"easyRide/models"
 	"easyRide/signals"
 	"easyRide/starter"
 	"encoding/json"
@@ -16,21 +16,13 @@ import (
 	"strconv"
 )
 
-const (
-	HOST = "localhost"
-	PORT = 5432
-	USR  = "temporal"
-	PASS = "temporal"
-	DB   = "postgres"
-)
-
 var db data.Database
 
 func main() {
 	router := mux.NewRouter()
 
 	var err error
-	db, err = data.Initialize(USR, PASS, DB)
+	db, err = data.Initialize()
 	if err != nil {
 		panic(err)
 	}

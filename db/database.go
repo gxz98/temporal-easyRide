@@ -4,17 +4,11 @@ import (
 	"database/sql"
 	"easyRide/models"
 	"fmt"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"log"
+	"os"
 	"time"
-)
-
-const (
-	HOST = "localhost"
-	PORT = 5432
-	USR  = "temporal"
-	PASS = "temporal"
-	DB   = "postgres"
 )
 
 type Database struct {
@@ -25,10 +19,15 @@ type Database struct {
 var ErrNoMatch = fmt.Errorf("no matching record")
 
 // Initialize will establish a db connection.
-func Initialize(username, password, database string) (Database, error) {
+func Initialize() (Database, error) {
 	db := Database{}
-	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		HOST, PORT, username, password, database)
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading environment .env file.")
+	}
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("HOST"), os.Getenv("PORT"), os.Getenv("USR"),
+		os.Getenv("PASS"), os.Getenv("DB"))
 	conn, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return db, err
@@ -274,7 +273,7 @@ func (db *Database) UpdatePassengerLoc(body *models.PassengerRequestBody) error 
 }
 
 //func main() {
-//	db, err := Initialize(USR, PASS, DB)
+//	_, err := Initialize()
 //	if err != nil {
 //		log.Println("Database connection failed")
 //		log.Println(err)

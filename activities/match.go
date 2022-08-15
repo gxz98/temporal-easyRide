@@ -13,7 +13,7 @@ import (
 
 func Match(ctx context.Context, lastRunTime, thisRunTime time.Time) error {
 	activity.GetLogger(ctx).Info("Match job running.", "lastRunTime_exclude", lastRunTime, "thisRunTime_include", thisRunTime)
-	db, err := postgres.Initialize(USR, PASS, DB)
+	db, err := postgres.Initialize()
 	if err != nil {
 		activity.GetLogger(ctx).Error("Database connection failed", "Error", err)
 	}
