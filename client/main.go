@@ -82,9 +82,10 @@ func PassengerSignUpHandler(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	err = db.AddPassenger(creds.Username, string(hashedPassword))
+	err = db.AddPassenger(creds.ID, creds.Username, string(hashedPassword))
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
+		writer.Write([]byte(err.Error()))
 		return
 	}
 	// credentials are correctly stored in the database, send default status of 200
@@ -104,9 +105,10 @@ func DriverSignUpHandler(writer http.ResponseWriter, request *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	err = db.AddDriver(creds.Username, string(hashedPassword))
+	err = db.AddDriver(creds.ID, creds.Username, string(hashedPassword))
 	if err != nil {
 		writer.WriteHeader(http.StatusInternalServerError)
+		writer.Write([]byte(err.Error()))
 		return
 	}
 	// credentials are correctly stored in the database, send default status of 200

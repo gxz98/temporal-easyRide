@@ -17,13 +17,14 @@ type Database struct {
 
 // ErrNoMatch is returned when we request a row that doesn't exist
 var ErrNoMatch = fmt.Errorf("no matching record")
+var ErrDuplicateRegister = fmt.Errorf("cannot register twice")
 
 // Initialize will establish a db connection.
 func Initialize() (Database, error) {
 	db := Database{}
-	err := godotenv.Load()
+	err := godotenv.Load("../.env")
 	if err != nil {
-		log.Fatal("Error loading environment .env file.")
+		log.Println("Error loading environment variable. ", err)
 	}
 	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("HOST"), os.Getenv("PORT"), os.Getenv("USR"),
@@ -43,9 +44,20 @@ func Initialize() (Database, error) {
 
 // Driver database
 
-func (db *Database) AddDriver(name string, password string) error {
-	query := `INSERT INTO drivers (name, password) VALUES ($1, $2)`
-	_, err := db.Conn.Query(query, name, password)
+func (db *Database) AddDriver(id int, name string, password string) error {
+	query := `SELECT exists(SELECT 1 from drivers where id=$1);`
+	rows := db.Conn.QueryRow(query, id)
+	var exists bool
+	err := rows.Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == true {
+		log.Println("Cannot register one driver twice!")
+		return ErrDuplicateRegister
+	}
+	query = `INSERT INTO drivers (name, password) VALUES ($1, $2)`
+	_, err = db.Conn.Exec(query, name, password)
 	if err != nil {
 		return err
 	}
@@ -144,9 +156,20 @@ func (db *Database) GetMatchedPassenger(driverId int) (passengerID int, e error)
 
 // Passenger database
 
-func (db *Database) AddPassenger(name string, password string) error {
-	query := `INSERT INTO passengers (name, password) VALUES ($1, $2)`
-	_, err := db.Conn.Query(query, name, password)
+func (db *Database) AddPassenger(id int, name string, password string) error {
+	query := `SELECT exists(SELECT 1 from passengers where id=$1);`
+	rows := db.Conn.QueryRow(query, id)
+	var exists bool
+	err := rows.Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == true {
+		log.Println("Cannot register one passenger twice!")
+		return ErrDuplicateRegister
+	}
+	query = `INSERT INTO passengers (name, password) VALUES ($1, $2)`
+	_, err = db.Conn.Exec(query, name, password)
 	if err != nil {
 		return err
 	}
@@ -272,11 +295,27 @@ func (db *Database) UpdatePassengerLoc(body *models.PassengerRequestBody) error 
 	return nil
 }
 
+func (db *Database) Mytest() (bool, error) {
+	query := `SELECT exists(SELECT 1 from drivers where id=$1);`
+	rows := db.Conn.QueryRow(query, 2)
+	var exists bool
+	err := rows.Scan(&exists)
+	if err != nil {
+		return true, err
+	}
+	return exists, nil
+}
+
 //func main() {
-//	_, err := Initialize()
+//	db, err := Initialize()
 //	if err != nil {
 //		log.Println("Database connection failed")
 //		log.Println(err)
+//	}
+//	res, errs := db.Mytest()
+//	fmt.Println(res)
+//	if errs != nil {
+//		log.Println(errs)
 //	}
 //
 //	err = db.UpdatePassengerStatus(1, &models.Driver{}, true)

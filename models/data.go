@@ -53,6 +53,7 @@ func (d *Driver) Init(name string, loc int, rating float64, lastTripEndAt string
 }
 
 type Credentials struct {
+	ID       int    `json:"id"`
 	Password string `json:"password"`
 	Username string `json:"username"`
 }
