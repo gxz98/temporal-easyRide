@@ -49,7 +49,7 @@ func main() {
 
 	router.HandleFunc("/driver/end-work", EndWorkHandler)
 	router.HandleFunc("/passenger/end-trip", EndTripHandler)
-	router.HandleFunc("/match-true/{workflow}", sendMatchTrue)
+	//router.HandleFunc("/match-true/{workflow}", sendMatchTrue)
 	// more features
 	//router.HandleFunc("/driver/confirm-trip/{confirm}", ConfirmTripHandler)
 	//router.HandleFunc("/passenger/report-danger", DangerHandler)
@@ -327,11 +327,11 @@ func EndTripHandler(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-func sendMatchTrue(writer http.ResponseWriter, request *http.Request) {
-	vars := mux.Vars(request)
-	id := vars["workflow"]
-	err := signals.SendMatchSignal(id, true)
-	if err != nil {
-		return
-	}
-}
+//func sendMatchTrue(writer http.ResponseWriter, request *http.Request) {
+//	vars := mux.Vars(request)
+//	id := vars["workflow"]
+//	err := signals.SendMatchSignal(id, true)
+//	if err != nil {
+//		return
+//	}
+//}
